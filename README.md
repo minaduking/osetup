@@ -51,6 +51,9 @@ ex) bin/osetup ./sample/
 }
 ```
 
+## License
+MIT
+
 ****
 
 # Contact
