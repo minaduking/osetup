@@ -22,7 +22,7 @@ bin/osetup [project directory]
 You create config.json in the project directory.
 
 #### create config.json ####
-````root directory
+````
 sample
 ├── config.json
 ````
