@@ -1,12 +1,13 @@
 package main
 
 import "fmt"
+// import "bytes"
 import "io/ioutil"
 import "encoding/json"
 import "runtime"
 import "os"
 import "os/exec"
-import "path/filepath"
+import "path"
 
 type Config struct {
 	Packages []Package `json: "packages"`
@@ -49,14 +50,14 @@ func main() {
 
 	var configFile string
 	var err error
-
+	
 	// config.json
 	if len(args) == 1 {
 		var curDir, _ = os.Getwd()
-		configFile = curDir + "/config.json"
+		configFile = path.Join(curDir, "config.json")
 	} else {
 		if confirmDir(args[1]) {
-			configFile = args[1] + "/config.json"
+			configFile = path.Join(args[1], "config.json")
 		} else {
 			fmt.Printf("Error: args don't directory path.")
 		}
@@ -80,28 +81,28 @@ func main() {
 	var versionManageDir string
 	switch runtime.GOOS {
 	case "windows":
-		versionManageDir = runtime.GOOS + "/chocolatey"
+		versionManageDir = path.Join(runtime.GOOS, "chocolatey")
 		settingsFile = "packages.config"
 	case "darwin":
-		versionManageDir = runtime.GOOS + "/homebrew"
+		versionManageDir = path.Join(runtime.GOOS, "homebrew")
 		settingsFile = "Brewfile"
 	case "linux":
-		versionManageDir = runtime.GOOS + "/linuxbrew"
+		versionManageDir = path.Join(runtime.GOOS, "linuxbrew")
 		settingsFile = "Brewfile"
 	default:
 		panic(err)
 	}
 
 	// それ用のフォルダを作成
-	settingsDir := filepath.Dir(configFile)
-	err = os.MkdirAll(settingsDir+"/"+versionManageDir, 0777)
+	settingsDir := path.Dir(configFile)
+	settingsDirPath := path.Join(settingsDir, versionManageDir)
+	err = os.MkdirAll(settingsDirPath, 0777)
 	if err != nil {
 		panic(err)
 	}
 
 	// ファイル操作
-	settingsDirPath := settingsDir + "/" + versionManageDir
-	settingsFilePath := settingsDirPath + "/" + settingsFile
+	settingsFilePath := path.Join(settingsDirPath, settingsFile)
 	_, err = os.Stat(settingsFilePath)
 	if err != nil {
 		err = ioutil.WriteFile(settingsFilePath, []byte(""), 0644)
@@ -116,13 +117,37 @@ func main() {
 
 	// ファイル書き込み
 	if runtime.GOOS == "windows"{
-		content := "<?xml version=\"1.0\"?>"
-		content += "<packages>"
+		content := "<?xml version=\"1.0\"?>\n"
+		content += "<packages>\n"
 		for _, v := range data.Packages {
 			content += "<package id=\""+v.Name+"\" />\n"
 		}
 		content += "</packages>"
 		ioutil.WriteFile(settingsFilePath, []byte(content), os.ModePerm)
+
+		command := `@powershell 
+					-NoProfile 
+					-ExecutionPolicy 
+					Bypass 
+					-Command 
+					"iex ((new-object net.webclient).DownloadString('https://chocolatey.org/install.ps1'))"
+					&& 
+					SET PATH=%PATH%;
+					%ALLUSERSPROFILE%\chocolatey\bin`
+		out, err := exec.Command("cmd", "/C", command).Output()
+		if err != nil {
+			panic(err)
+		}
+
+		var curDir, _ = os.Getwd()
+		os.Chdir(settingsDirPath)
+		out, err = exec.Command("cmd", "/C", "cinst -y " + settingsFilePath).Output()
+		if err != nil {
+			panic(err)
+		}
+		fmt.Println(string(out))
+		os.Chdir(curDir)
+		os.Exit(0)
 
 	}else if runtime.GOOS == "darwin"{
 		content := "cask_args appdir: '/Applications'\n"
