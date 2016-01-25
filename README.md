@@ -17,7 +17,11 @@ git clone https://github.com/minaduking/osetup.git
 ****
 
 ## usage
+#### run osetup
+
+````
 bin/osetup [project directory]
+````
 
 You create config.json in the project directory.
 
